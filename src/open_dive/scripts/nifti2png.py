@@ -54,6 +54,38 @@ def main():
         help="Optional tractogram to plot with slices",
     )
 
+    
+ # Add tensor visualization option
+    parser.add_argument(
+        "--visualize_tensor",
+        action="store_true",
+        help="Whether to visualize diffusion tensors on the NIFTI image",
+    )
+    
+    # Add ODF visualization option
+    parser.add_argument(
+        "--visualize_odf",
+        action="store_true",
+        help="Whether to visualize ODFs on the NIFTI image",
+    )
+    
+    # Add spherical harmonic max order for ODF
+    parser.add_argument(
+        "--sh_order_max",
+        type=int,
+        default=6,
+        help="Maximum spherical harmonic order for ODF visualization (default 6)",
+    )
+    
+    # Add basis for ODF spherical harmonics
+    parser.add_argument(
+        "--sh_basis",
+        choices=["real", "complex"],
+        default="real",
+        help="Basis for spherical harmonics: 'real' or 'complex' (default 'real')",
+    )
+
+ 
 
     args = parser.parse_args()
 
@@ -70,6 +102,12 @@ def main():
         interpolation=args.interpolation,
         scalar_colorbar=args.scalar_colorbar,
         tractography=args.tractography,
+        visualize_tensor=args.visualize_tensor,  # Pass the new argument
+        visualize_odf=args.visualize_odf,        # Pass the new argument
+        sh_order_max=args.sh_order_max,          # Pass the ODF spherical harmonic order
+        sh_basis=args.sh_basis, 
 
     )
+if __name__ == "__main__":
+    main()
 

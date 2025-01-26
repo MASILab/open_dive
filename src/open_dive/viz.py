@@ -18,6 +18,10 @@ def plot_nifti(
     scalar_colorbar=True,
     tractography=None,
     volume_idx=None,
+    visualize_tensor=False,
+    visualize_odf=False,
+    sh_order_max=6,
+    sh_basis='real',
     **kwargs,
 ):
     """Create a 2D rendering of a NIFTI slice.
@@ -138,7 +142,32 @@ def plot_nifti(
         stream_actor = actor.line(streamlines, colors=(1, 0, 0))
         scene.add(stream_actor)
 
+    if visualize_tensor:
+        fetch_sherbrooke_3shell()  # Optional: Fetch 3-shell DWI data
+        img, gtab = read_sherbrooke_3shell()
 
+        data = img.get_fdata()
+        tensor_model = TensorModel(gtab)
+        tensor_fit = tensor_model.fit(data)
+        
+        evecs = tensor_fit.evecs  # Eigenvectors, shape (x, y, z, 3, 3)
+        evals = tensor_fit.evals  # Eigenvalues, shape (x, y, z, 3)
+
+        if evecs.shape[:-1] == evals.shape[:-1]:
+            tensor_actor = tensor_slicer(data, affine=affine, evecs=evecs, scale=0.3)
+            scene.add(tensor_actor)
+
+    if visualize_odf:
+        fetch_sherbrooke_3shell()  # Fetch data if necessary
+        img, gtab = read_sherbrooke_3shell()
+        data = img.get_fdata()
+        gtab = gradient_table(gtab)
+
+        # Visualize ODF using spherical harmonics
+        sphere = gtab.scheme.to_sphere(sh_order_max)
+        odf_actor = odf_slicer(data, sphere=sphere, basis=sh_basis, scale=0.3)
+        scene.add(odf_actor)
+        print("pass2")
     
 
 

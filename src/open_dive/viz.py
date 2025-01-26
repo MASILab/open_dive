@@ -6,6 +6,14 @@ from fury.colormap import colormap_lookup_table
 import vtk
 import pdb 
 from pathlib import Path
+from dipy.reconst.dti import TensorModel
+from fury.actor import slicer, tensor_slicer, odf_slicer
+from dipy.data import fetch_sherbrooke_3shell, read_sherbrooke_3shell
+from dipy.core.gradients import gradient_table
+from dipy.reconst.dti import from_lower_triangular, decompose_tensor
+from dipy.core.sphere import HemiSphere, Sphere
+from dipy.direction import peaks_from_model
+from dipy.reconst.shm import CsaOdfModel
 
 
 def plot_nifti(
@@ -54,6 +62,7 @@ def plot_nifti(
     nifti = nib.as_closest_canonical(nifti)
     data = nifti.get_fdata()
 
+    
     if len(data.shape) == 4:
         if volume_idx is None:
             raise ValueError(
@@ -143,41 +152,19 @@ def plot_nifti(
             colors = [(1, 0, 0)] * len(tractography)  # All red
             
         # Add each tractography with its corresponding color
-    for tract_file, color in zip(tractography, colors):
-        streamlines = nib.streamlines.load(tract_file).streamlines
-        stream_actor = actor.line(streamlines, colors=color)
-        scene.add(stream_actor)
+            for tract_file, color in zip(tractography, colors):
+                streamlines = nib.streamlines.load(tract_file).streamlines
+                stream_actor = actor.line(streamlines, colors=color)
+                scene.add(stream_actor)
 
     if visualize_tensor:
-        fetch_sherbrooke_3shell()  # Optional: Fetch 3-shell DWI data
-        img, gtab = read_sherbrooke_3shell()
-
-        data = img.get_fdata()
-        tensor_model = TensorModel(gtab)
-        tensor_fit = tensor_model.fit(data)
-        
-        evecs = tensor_fit.evecs  # Eigenvectors, shape (x, y, z, 3, 3)
-        evals = tensor_fit.evals  # Eigenvalues, shape (x, y, z, 3)
-
-        if evecs.shape[:-1] == evals.shape[:-1]:
-            tensor_actor = tensor_slicer(data, affine=affine, evecs=evecs, scale=0.3)
-            scene.add(tensor_actor)
+        tensors = from_lower_triangular(data)
+        eigenvalues, eigenvectors = decompose_tensor(tensors)
+        tensor_actor = actor.tensor_slicer(evals=eigenvalues, evecs=eigenvectors)
+        scene.add(tensor_actor)
 
     if visualize_odf:
-        fetch_sherbrooke_3shell()  # Fetch data if necessary
-        img, gtab = read_sherbrooke_3shell()
-        data = img.get_fdata()
-        gtab = gradient_table(gtab)
-
-        # Visualize ODF using spherical harmonics
-        sphere = gtab.scheme.to_sphere(sh_order_max)
-        odf_actor = odf_slicer(data, sphere=sphere, basis=sh_basis, scale=0.3)
-        scene.add(odf_actor)
-        print("pass2")
-    
-
-
-
+        pass
 
     # Set up camera
     scene.set_camera(position=camera_pos, focal_point=camera_focal, view_up=camera_up)

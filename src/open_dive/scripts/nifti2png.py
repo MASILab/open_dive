@@ -55,18 +55,17 @@ def main():
         help="Optional tractogram(s) to plot with slices. Can provide multiple files.",
     )
 
-    
- # Add tensor visualization option
+    # Add tensor visualization option
     parser.add_argument(
         "--visualize_tensor",
-        action="store_true",
+        default=True,
         help="Whether to visualize diffusion tensors on the NIFTI image",
     )
     
     # Add ODF visualization option
     parser.add_argument(
         "--visualize_odf",
-        action="store_true",
+        default=True,
         help="Whether to visualize ODFs on the NIFTI image",
     )
     
@@ -109,6 +108,5 @@ def main():
         sh_basis=args.sh_basis, 
 
     )
-if __name__ == "__main__":
-    main()
+
 

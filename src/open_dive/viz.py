@@ -5,6 +5,7 @@ from fury.actor import slicer
 from fury.colormap import colormap_lookup_table
 import vtk
 import pdb 
+from pathlib import Path
 
 
 def plot_nifti(
@@ -138,8 +139,13 @@ def plot_nifti(
         scene.add(scalar_bar)
     # Add tractography
     if tractography is not None:
-        streamlines = nib.streamlines.load(tractography).streamlines
-        stream_actor = actor.line(streamlines, colors=(1, 0, 0))
+        # Convert to list if single tractography file
+            colors = [(1, 0, 0)] * len(tractography)  # All red
+            
+        # Add each tractography with its corresponding color
+    for tract_file, color in zip(tractography, colors):
+        streamlines = nib.streamlines.load(tract_file).streamlines
+        stream_actor = actor.line(streamlines, colors=color)
         scene.add(stream_actor)
 
     if visualize_tensor:

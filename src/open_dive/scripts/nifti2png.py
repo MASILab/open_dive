@@ -51,7 +51,8 @@ def main():
         ## plot tractogram with slices
         "--tractography",
         type=Path,
-        help="Optional tractogram to plot with slices",
+        nargs="+",  # Accept one or more arguments
+        help="Optional tractogram(s) to plot with slices. Can provide multiple files.",
     )
 
     

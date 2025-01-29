@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description="Plot a slice of a NIFTI file")
     parser.add_argument("nifti_path", type=Path, help="Path to NIFTI to plot")
     parser.add_argument(
-        "-s", "--slice", default="m", help='Slice to plot or "m" for middle slice'
+        "-s", "--slice", default="m", help='Slice index (integer) or "m" for middle slice'
     )
     parser.add_argument(
         "-o",
@@ -54,40 +54,38 @@ def main():
         nargs="+",  # Accept one or more arguments
         help="Optional tractogram(s) to plot with slices. Can provide multiple files.",
     )
-
-    # Add tensor visualization option
     parser.add_argument(
-        "--visualize_tensor",
-        default=True,
-        help="Whether to visualize diffusion tensors on the NIFTI image",
+        "--tractography_values",
+        type=float,
+        nargs="+",
+        help="Values to use for coloring each tractogram (must match number of tractography files)",
     )
-    
-    # Add ODF visualization option
     parser.add_argument(
-        "--visualize_odf",
-        default=True,
-        help="Whether to visualize ODFs on the NIFTI image",
+        "--tractography_cmap",
+        help="Matplotlib colormap to use for tractography. Default is plasma if tractograph_values is provided, otherwise Set1.",
     )
-    
-    # Add spherical harmonic max order for ODF
     parser.add_argument(
-        "--sh_order_max",
-        type=int,
-        default=6,
-        help="Maximum spherical harmonic order for ODF visualization (default 6)",
+        "--tractography_cmap_range",
+        type=float,
+        nargs=2,
+        help="Optional range to use for the colormap. Default is 0 to 1.",
     )
-    
-    # Add basis for ODF spherical harmonics
     parser.add_argument(
-        "--sh_basis",
-        choices=["real", "complex"],
-        default="real",
-        help="Basis for spherical harmonics: 'real' or 'complex' (default 'real')",
+        "--tractography_colorbar",
+        action="store_true",
+        help="Whether to show a tractography values colorbar, by default False",
     )
 
- 
+
 
     args = parser.parse_args()
+
+    # Convert slice argument to int if it's not 'm'
+    if args.slice != "m":
+        try:
+            args.slice = int(args.slice)
+        except ValueError:
+            raise ValueError("Slice argument must be either 'm' or an integer")
 
     # Plot the NIFTI
     plot_nifti(
@@ -102,11 +100,10 @@ def main():
         interpolation=args.interpolation,
         scalar_colorbar=args.scalar_colorbar,
         tractography=args.tractography,
-        visualize_tensor=args.visualize_tensor,  # Pass the new argument
-        visualize_odf=args.visualize_odf,        # Pass the new argument
-        sh_order_max=args.sh_order_max,          # Pass the ODF spherical harmonic order
-        sh_basis=args.sh_basis, 
-
+        tractography_values=args.tractography_values,
+        tractography_cmap=args.tractography_cmap,
+        tractography_cmap_range=args.tractography_cmap_range,
+        tractography_colorbar=args.tractography_colorbar,
     )
 
 

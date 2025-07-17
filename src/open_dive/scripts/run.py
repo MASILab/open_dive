@@ -20,6 +20,7 @@ def main():
         "Diffusion glyph options (tensors and ODFs)"
     )
     window_group = parser.add_argument_group("Window options")
+    roi_mask_group = parser.add_argument_group("ROI mask options")
 
     scalar_group.add_argument(
         "-n",
@@ -65,6 +66,12 @@ def main():
         type=Path,
         help="Path to binary mask to generate a glass brain.",
     )
+    scalar_group.add_argument(
+        "--glass_brain_opacity",
+        type=float,
+        default=0.33,
+        help="Opacity of the glass brain in range (0, 1]. Default is 0.33.",
+    )
 
     tractography_group.add_argument(
         ## plot tractogram with slices
@@ -100,6 +107,58 @@ def main():
         "--tractography_colorbar",
         action="store_true",
         help="Whether to show a tractography values colorbar. Default is False.",
+    )
+    tractography_group.add_argument(
+        "--tractography_is_categorical_values",
+        action="store_true",
+        help="If provided, the tractography values are treated as categorical values. Default is False.",
+    )
+    tractography_group.add_argument(
+        "--tractography_categorical_values",
+        type=str,
+        nargs="+",
+        help="List of categorical values for tractography. Must match number of tractography files.",
+    )
+    tractography_group.add_argument(
+        "--tractography_categorical_reference_values",
+        type=str,
+        nargs="+",
+        help="List of reference categorical values for tractography.",
+    )
+
+    roi_mask_group.add_argument(
+        "--roi_mask_path",
+        type=Path,
+        nargs="+",  # Accept one or more arguments
+        help="Path to binary mask(s) to plot as ROI mask(s).",
+    )
+    roi_mask_group.add_argument(
+        "--roi_mask_values",
+        type=float,
+        nargs="+",
+        help="Values to use for coloring each ROI mask (must match number of ROI mask files)",
+    )
+    roi_mask_group.add_argument(
+        "--roi_mask_cmap",
+        help='Matplotlib or cmcrameri colormap to use for ROI mask. Default is "plasma" if --roi_mask_values is provided, otherwise "Set1".',
+    )
+    roi_mask_group.add_argument(
+    "--roi_mask_cmap_range",
+        type=float,
+        nargs=2,
+        help="Range to use for the colormap. Default is (0, 1).",
+    )
+    roi_mask_group.add_argument(
+        "--roi_mask_opacity",
+        type=float,
+        nargs="+",
+        default=[0.33],
+        help="Value to use for the ROI mask opacity in range (0, 1]. If a list, each value corresponds to a ROI mask in --roi_mask_path. Default is 0.33.",
+    )
+    roi_mask_group.add_argument(
+        "--roi_mask_colorbar",
+        action="store_true",
+        help="Whether to show a ROI mask values colorbar. Default is False.",
     )
 
     glyph_group.add_argument(
@@ -177,6 +236,9 @@ def main():
         tractography_cmap=args.tractography_cmap,
         tractography_cmap_range=args.tractography_cmap_range,
         tractography_colorbar=args.tractography_colorbar,
+        tractography_is_categorical_values=args.tractography_is_categorical_values,
+        tractography_categorical_values=args.tractography_categorical_values,
+        tractography_categorical_reference_values=args.tractography_categorical_reference_values,
         tensor_path=args.tensor_path,
         odf_path=args.odf_path,
         sh_basis=args.sh_basis,
@@ -184,4 +246,11 @@ def main():
         azimuth=args.azimuth,
         elevation=args.elevation,
         glass_brain_path=args.glass_brain,
+        glass_brain_opacity=args.glass_brain_opacity,
+        roi_mask_path=args.roi_mask_path,
+        roi_mask_values=args.roi_mask_values,
+        roi_mask_cmap=args.roi_mask_cmap,
+        roi_mask_cmap_range=args.roi_mask_cmap_range,
+        roi_mask_opacity=args.roi_mask_opacity,
+        roi_mask_colorbar=args.roi_mask_colorbar
     )

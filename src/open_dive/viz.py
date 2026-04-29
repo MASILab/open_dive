@@ -22,7 +22,7 @@ from fury.actor import (
 )
 from fury.lib import Actor
 from fury.utils import apply_affine
-from fury.colormap import create_colormap
+from fury.colormap import line_colors, orient2rgb, boys2rgb
 from matplotlib.colors import Colormap
 from scipy.ndimage import binary_dilation, gaussian_filter
 
@@ -49,6 +49,7 @@ def plot_nifti(
     tractography_values: list[float] | None = None,
     tractography_cmap: str | None = None,
     tractography_cmap_range: tuple[int, int] | None = None,
+    tractography_color_by_endpoints: bool = False,
     tractography_colorbar: bool = False,
     volume_idx: int | None = None,
     tensor_path: os.PathLike | None = None,
@@ -101,9 +102,11 @@ def plot_nifti(
     tractography_values : list of float, optional
         Optional values to color the tractography with
     tractography_cmap : str, default "Set1" or "plasma"
-        Optional colormap to use for the tractography, by default "Set1" if tractography_values, otherwise "plasma"
+        Optional colormap to use for the tractography, by default "Set1" if tractography_values, otherwise "plasma".
     tractography_cmap_range : tuple of float, default (0, 1) if tractography_values is not None
         Optional range to use for the colormap
+    tractography_color_by_endpoints : bool, default False
+        Whether to color by endpoints alone or by individual points when using colormaps "rgb_standard" or "boys_standard"
     tractography_colorbar : bool, default False
         Whether to show a colorbar for the tractography
     volume_idx : int, optional
@@ -239,7 +242,29 @@ def plot_nifti(
 
     # Add tractography
     if tractography_path is not None:
-        cmap = plt.get_cmap(tractography_cmap)
+        if tractography_cmap not in ["rgb_standard", "boys_standard"]:
+            cmap = plt.get_cmap(tractography_cmap)
+
+            # Set to range
+            if tractography_values is not None:
+                norm = plt.Normalize(
+                    vmin=tractography_cmap_range[0], vmax=tractography_cmap_range[1]
+                )
+                colors = [cmap(norm(val)) for val in tractography_values]
+            else:
+                colors = [cmap(i) for i in range(len(tractography_path))]
+
+            # Apply colorbar
+            if tractography_colorbar:
+                tract_bar = _create_colorbar_actor(
+                    value_range=tractography_cmap_range,
+                    colorbar_position=(0.1, 0.1),
+                    colorbar_height=0.5,
+                    colorbar_width=0.1,
+                    cmap=cmap,
+                    labels=tractography_cbar_labels,
+                )
+                scene.add(tract_bar)
 
         # Set to range
         if tractography_values is not None:
@@ -248,25 +273,14 @@ def plot_nifti(
             )
             colors = [cmap(norm(val)) for val in tractography_values]
         else:
-            colors = [cmap(i) for i in range(len(tractography_path))]
-
-        # Apply colorbar
-        if tractography_colorbar:
-            tract_bar = _create_colorbar_actor(
-                value_range=tractography_cmap_range,
-                colorbar_position=(0.1, 0.1),
-                colorbar_height=0.5,
-                colorbar_width=0.1,
-                cmap=cmap,
-                labels=tractography_cbar_labels,
-            )
-            scene.add(tract_bar)
+            colors = tractography_cmap
 
         # Add each tractography with its corresponding color
         stream_actors = _create_tractography_actor(
             tractography_path,
             colors=colors,
             tractography_opacity=tractography_opacity,
+            tractography_color_by_endpoints=tractography_color_by_endpoints,
         )
         for stream_actor in stream_actors:
             scene.add(stream_actor)
@@ -501,10 +515,11 @@ def _create_colorbar_actor(
 
 def _create_tractography_actor(
     tractography_path: list[os.PathLike],
-    colors: list[tuple[float, float, float]],
+    colors: list[tuple[float, float, float]] | str,
     tractography_opacity: list[float] = [0.6],
+    tractography_color_by_endpoints: bool = False,
 ) -> list[Actor]:
-    """Create tractography actors from a list of NIFTI files."""
+    """Create tractography actors from a list of files."""
 
     # Loop over each tractography file and create an actor
     stream_actors = []
@@ -513,13 +528,53 @@ def _create_tractography_actor(
         if len(tractography_opacity) == 1
         else tractography_opacity
     )
-    for i, (tract_file, color) in enumerate(zip(tractography_path, colors)):
-        streamlines_nifti = nib.streamlines.load(tract_file)
-        streamlines = streamlines_nifti.streamlines
-        stream_actor = actor.line(
-            streamlines, colors=color, linewidth=0.2, opacity=tractography_opacity[i]
-        )
-        stream_actors.append(stream_actor)
+    if colors in ["rgb_standard", "boys_standard"]:
+        for i, tract_file in enumerate(tractography_path):
+            streamlines_nifti = nib.streamlines.load(tract_file)
+            streamlines = streamlines_nifti.streamlines
+
+            if tractography_color_by_endpoints:
+                streamlines_colors = line_colors(streamlines, cmap=colors)
+            else:
+                # Color each point in streamlines based on orientation
+                streamlines_diff = [
+                    np.diff(streamline, axis=0, prepend=streamline[0:1, :])
+                    for streamline in streamlines
+                ]
+                streamlines_diff = [
+                    diff / (1e-8 + np.linalg.norm(diff, axis=1, keepdims=True))
+                    for diff in streamlines_diff
+                ]
+                if colors == "rgb_standard":
+                    streamlines_colors = [
+                        orient2rgb(streamline_diff)
+                        for streamline_diff in streamlines_diff
+                    ]
+                elif colors == "boys_standard":
+                    streamlines_colors = [
+                        boys2rgb(streamline_diff)
+                        for streamline_diff in streamlines_diff
+                    ]
+                streamlines_colors = np.concatenate(streamlines_colors, axis=0)
+
+            stream_actor = actor.line(
+                streamlines,
+                colors=streamlines_colors,
+                linewidth=0.2,
+                opacity=tractography_opacity[i],
+            )
+            stream_actors.append(stream_actor)
+    else:
+        for i, (tract_file, color) in enumerate(zip(tractography_path, colors)):
+            streamlines_nifti = nib.streamlines.load(tract_file)
+            streamlines = streamlines_nifti.streamlines
+            stream_actor = actor.line(
+                streamlines,
+                colors=color,
+                linewidth=0.2,
+                opacity=tractography_opacity[i],
+            )
+            stream_actors.append(stream_actor)
     return stream_actors
 
 

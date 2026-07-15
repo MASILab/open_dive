@@ -26,21 +26,22 @@ from fury.colormap import line_colors, orient2rgb, boys2rgb
 from matplotlib.colors import Colormap
 from scipy.ndimage import binary_dilation, gaussian_filter
 
+
 def plot_nifti(
     nifti_path: os.PathLike | None = None,
-    data_slice: str | int = "m",
+    data_slice: str | tuple[int, int, int] | int = "m",
     orientation: str = "axial",
     size: tuple[int, int] = (600, 400),
     zoom: float = 1.0,
     azimuth: float | None = None,
     elevation: float | None = None,
-    value_range: tuple[int, int] | None = None,
+    value_range: tuple[float, float] | None = None,
     opacity: float = 1.0,
     save_path: os.PathLike | None = None,
     headless: bool = False,
     scalar_colorbar: bool = True,
     overlay_path: os.PathLike | None = None,
-    overlay_value_range: tuple[int, int] | None = None,
+    overlay_value_range: tuple[float, float] | None = None,
     overlay_opacity: float = 0.5,
     overlay_cmap: str | None = None,
     tractography_path: list[os.PathLike] | None = None,
@@ -136,7 +137,18 @@ def plot_nifti(
         elevation = 90 if elevation is None else elevation
 
     # Set slice to int if not "m"
-    if data_slice != "m":
+    focus = None
+    if isinstance(data_slice, list):
+        focus = np.array(data_slice, dtype=int)
+        data_slice = (
+            focus[2]
+            if orientation == "axial"
+            else focus[1]
+            if orientation == "coronal"
+            else focus[0]
+        )
+        data_slice = int(data_slice)
+    elif data_slice != "m":
         data_slice = int(data_slice)
 
     # If tractography_values are not provided, use a discrete colormap
@@ -144,7 +156,9 @@ def plot_nifti(
         tractography_cmap = "Set1" if tractography_values is None else "plasma"
     if tractography_cmap_range is None:
         tractography_cmap_range = (
-            (0, 1) if tractography_values is None else (min(tractography_values), max(tractography_values))
+            (0, 1)
+            if tractography_values is None
+            else (min(tractography_values), max(tractography_values))
         )
     tractography_cbar_labels = tractography_values is not None
 
@@ -159,8 +173,11 @@ def plot_nifti(
     scene_bound_nifti_path = nifti_path or tensor_path or odf_path or glass_brain_path
     if scene_bound_nifti_path is not None:
         scene_bound_nifti = nib.load(scene_bound_nifti_path)
-        scene_bound_data_shape = scene_bound_nifti.shape
+        # scene_bound_data, scene_bound_affine = load_nifti(scene_bound_nifti_path)
+        scene_bound_nifti = nib.as_closest_canonical(scene_bound_nifti)
         scene_bound_affine = scene_bound_nifti.affine
+        scene_bound_data = scene_bound_nifti.get_fdata()
+        scene_bound_data_shape = scene_bound_data.shape
 
         max_x = int(scene_bound_data_shape[0] * 1.5)
         max_y = int(scene_bound_data_shape[1] * 1.5)
@@ -168,17 +185,23 @@ def plot_nifti(
 
         # Get slice if not defined
         if orientation == "axial":
-            data_slice = scene_bound_data_shape[2] // 2 if data_slice == "m" else data_slice
+            data_slice = (
+                scene_bound_data_shape[2] // 2 if data_slice == "m" else data_slice
+            )
             extent = (0, max_x, 0, max_y, data_slice, data_slice)
             offset = np.array([0, 0, scale])
 
         elif orientation == "coronal":
-            data_slice = scene_bound_data_shape[1] // 2 if data_slice == "m" else data_slice
+            data_slice = (
+                scene_bound_data_shape[1] // 2 if data_slice == "m" else data_slice
+            )
             extent = (0, max_x, data_slice, data_slice, 0, max_z)
             offset = np.array([0, scale, 0])
 
         elif orientation == "sagittal":
-            data_slice = scene_bound_data_shape[0] // 2 if data_slice == "m" else data_slice
+            data_slice = (
+                scene_bound_data_shape[0] // 2 if data_slice == "m" else data_slice
+            )
             extent = (data_slice, data_slice, 0, max_y, 0, max_z)
             offset = np.array([scale, 0, 0])
 
@@ -201,7 +224,7 @@ def plot_nifti(
             value_range=overlay_value_range,
             opacity=overlay_opacity,
             cmap=overlay_cmap,
-            offset=offset*0.25,
+            offset=offset * 0.25,
             is_zero_background=True,
             **kwargs,
         )
@@ -224,7 +247,9 @@ def plot_nifti(
 
             # Set to range
             if tractography_values is not None:
-                norm = plt.Normalize(vmin=tractography_cmap_range[0], vmax=tractography_cmap_range[1])
+                norm = plt.Normalize(
+                    vmin=tractography_cmap_range[0], vmax=tractography_cmap_range[1]
+                )
                 colors = [cmap(norm(val)) for val in tractography_values]
             else:
                 colors = [cmap(i) for i in range(len(tractography_path))]
@@ -241,6 +266,12 @@ def plot_nifti(
                 )
                 scene.add(tract_bar)
 
+        # Set to range
+        if tractography_values is not None:
+            norm = plt.Normalize(
+                vmin=tractography_cmap_range[0], vmax=tractography_cmap_range[1]
+            )
+            colors = [cmap(norm(val)) for val in tractography_values]
         else:
             colors = tractography_cmap
 
@@ -281,11 +312,14 @@ def plot_nifti(
 
         if scene_bound_data_shape is None:
             glass_brain = nib.load(glass_brain_path)
-            scene_bound_data_shape = glass_brain.shape
-            scene_bound_affine = glass_brain.affine
+            glass_brain_data = glass_brain.get_fdata()
+            glass_brain_affine = glass_brain.affine
+            scene_bound_data_shape = glass_brain_data.shape
+            scene_bound_affine = glass_brain_affine
 
     _set_camera(
         scene=scene,
+        focus=focus,
         azimuth=azimuth,
         elevation=elevation,
         scene_bound_data_shape=scene_bound_data_shape,
@@ -330,6 +364,7 @@ def _create_glass_brain_actor(
     """
     # Load the mask
     mask_nifti = nib.load(mask_nifti)
+    # mask_nifti = nib.as_closest_canonical(mask_nifti)
     mask = mask_nifti.get_fdata()
     affine = mask_nifti.affine
     zooms = mask_nifti.header.get_zooms()[:3]
@@ -345,11 +380,16 @@ def _create_glass_brain_actor(
     mask_thres = (mask_smooth > 0.5).astype(np.uint8)
 
     # Step 4: Dilate the thresholded mask with 2 passes
-    mask_dilated = binary_dilation(mask_thres, iterations=dilation_iters).astype(np.uint8)
+    mask_dilated = binary_dilation(mask_thres, iterations=dilation_iters).astype(
+        np.uint8
+    )
 
     # Create a surface actor
-    glass_brain_actor = contour_from_roi(mask_dilated, affine=new_affine, opacity=opacity, color=(0.5, 0.5, 0.5))
+    glass_brain_actor = contour_from_roi(
+        mask_dilated, affine=new_affine, opacity=opacity, color=(0.5, 0.5, 0.5)
+    )
     return glass_brain_actor
+
 
 def _create_nifti_actor(
     nifti_path: os.PathLike,
@@ -362,6 +402,8 @@ def _create_nifti_actor(
     **kwargs,
 ) -> Actor:
     # Load the data and convert to RAS
+    # nifti = nib.load(nifti_path)
+    # nifti = nib.as_closest_canonical(nifti)
     nifti = nib.load(nifti_path)
 
     if len(nifti.shape) == 4:
@@ -371,10 +413,14 @@ def _create_nifti_actor(
                 "Please provide a volume_idx parameter to select which 3D volume to display."
             )
         if not 0 <= volume_idx < nifti.shape[3]:
-            raise ValueError(f"volume_idx {volume_idx} is out of bounds for image with {nifti.shape[3]} volumes")
+            raise ValueError(
+                f"volume_idx {volume_idx} is out of bounds for image with {nifti.shape[3]} volumes"
+            )
         data = nifti.dataobj[..., volume_idx]
     elif len(nifti.shape) != 3:
-        raise ValueError(f"Expected 3D or 4D image, but got image with {len(nifti.shape)} dimensions")
+        raise ValueError(
+            f"Expected 3D or 4D image, but got image with {len(nifti.shape)} dimensions"
+        )
     else:
         data = nifti.get_fdata()
 
@@ -404,9 +450,16 @@ def _create_nifti_actor(
         lut.SetTableValue(i, r, g, b, opacity)
 
     # Set up slicer and window
-    slice_actor = slicer(data, value_range=value_range, affine=affine, lookup_colormap=lut, opacity=opacity, **kwargs)
-    
-    # Set offset 
+    slice_actor = slicer(
+        data,
+        value_range=value_range,
+        affine=affine,
+        lookup_colormap=lut,
+        opacity=opacity,
+        **kwargs,
+    )
+
+    # Set offset
     position = slice_actor.GetPosition()
     position += offset
     slice_actor.SetPosition(position)
@@ -415,7 +468,7 @@ def _create_nifti_actor(
 
 
 def _create_colorbar_actor(
-    value_range: tuple[int, int] | None = None,
+    value_range: tuple[float, float] | None = None,
     colorbar_position: tuple[float, float] = (0.8, 0.1),
     colorbar_height: float = 0.5,
     colorbar_width: float = 0.1,
@@ -471,7 +524,9 @@ def _create_tractography_actor(
     # Loop over each tractography file and create an actor
     stream_actors = []
     tractography_opacity = (
-        tractography_opacity * len(tractography_path) if len(tractography_opacity) == 1 else tractography_opacity
+        tractography_opacity * len(tractography_path)
+        if len(tractography_opacity) == 1
+        else tractography_opacity
     )
     if colors in ["rgb_standard", "boys_standard"]:
         for i, tract_file in enumerate(tractography_path):
@@ -482,21 +537,43 @@ def _create_tractography_actor(
                 streamlines_colors = line_colors(streamlines, cmap=colors)
             else:
                 # Color each point in streamlines based on orientation
-                streamlines_diff = [np.diff(streamline, axis=0, prepend=streamline[0:1,:]) for streamline in streamlines]
-                streamlines_diff = [diff / (1e-8 + np.linalg.norm(diff, axis=1, keepdims=True)) for diff in streamlines_diff]
+                streamlines_diff = [
+                    np.diff(streamline, axis=0, prepend=streamline[0:1, :])
+                    for streamline in streamlines
+                ]
+                streamlines_diff = [
+                    diff / (1e-8 + np.linalg.norm(diff, axis=1, keepdims=True))
+                    for diff in streamlines_diff
+                ]
                 if colors == "rgb_standard":
-                    streamlines_colors = [orient2rgb(streamline_diff) for streamline_diff in streamlines_diff]
+                    streamlines_colors = [
+                        orient2rgb(streamline_diff)
+                        for streamline_diff in streamlines_diff
+                    ]
                 elif colors == "boys_standard":
-                    streamlines_colors = [boys2rgb(streamline_diff) for streamline_diff in streamlines_diff]
+                    streamlines_colors = [
+                        boys2rgb(streamline_diff)
+                        for streamline_diff in streamlines_diff
+                    ]
                 streamlines_colors = np.concatenate(streamlines_colors, axis=0)
 
-            stream_actor = actor.line(streamlines, colors=streamlines_colors, linewidth=0.2, opacity=tractography_opacity[i])
+            stream_actor = actor.line(
+                streamlines,
+                colors=streamlines_colors,
+                linewidth=0.2,
+                opacity=tractography_opacity[i],
+            )
             stream_actors.append(stream_actor)
     else:
         for i, (tract_file, color) in enumerate(zip(tractography_path, colors)):
             streamlines_nifti = nib.streamlines.load(tract_file)
             streamlines = streamlines_nifti.streamlines
-            stream_actor = actor.line(streamlines, colors=color, linewidth=0.2, opacity=tractography_opacity[i])
+            stream_actor = actor.line(
+                streamlines,
+                colors=color,
+                linewidth=0.2,
+                opacity=tractography_opacity[i],
+            )
             stream_actors.append(stream_actor)
     return stream_actors
 
@@ -510,7 +587,11 @@ def _create_tensor_actor(
     """Create a tensor actor from a NIFTI file."""
 
     # Load the tensor data and affine
-    tensor_data, tensor_affine = load_nifti(tensor_path)
+    # tensor_data, tensor_affine = load_nifti(tensor_path)
+    tensor_nifti = nib.load(tensor_path)
+    tensor_nifti = nib.as_closest_canonical(tensor_nifti)
+    tensor_data = tensor_nifti.get_fdata()
+    tensor_affine = tensor_nifti.affine
     tensor_matrix = from_lower_triangular(tensor_data)
     eigvals, eigvecs = decompose_tensor(tensor_matrix)
     mask = np.ones(tensor_data.shape[:3])
@@ -567,10 +648,16 @@ def _create_odf_actor(
     """Create an ODF actor from a NIFTI file."""
 
     # Load the ODF data and render it
-    odf_data, odf_affine = load_nifti(odf_path)
+    # odf_data, odf_affine = load_nifti(odf_path)
+    odf_nifti = nib.load(odf_path)
+    odf_nifti = nib.as_closest_canonical(odf_nifti)
+    odf_data = odf_nifti.get_fdata()
+    odf_affine = odf_nifti.affine
     sphere = get_sphere(name="repulsion724")  # Use a precomputed sphere
     sh_order_max = calculate_max_order(odf_data.shape[-1])
-    B, _ = sh_to_sf_matrix(sphere=sphere, sh_order_max=sh_order_max, basis_type=sh_basis)
+    B, _ = sh_to_sf_matrix(
+        sphere=sphere, sh_order_max=sh_order_max, basis_type=sh_basis
+    )
     odf_actor = odf_slicer(
         odf_data,
         sphere=sphere,
@@ -592,6 +679,7 @@ def _set_camera(
     scene: window.Scene,
     azimuth: float,
     elevation: float,
+    focus: tuple[int, int, int] | None = None,
     scene_bound_data_shape: np.ndarray | None = None,
     scene_bound_affine: np.ndarray | None = None,
     zoom: float = 1.0,
@@ -614,32 +702,32 @@ def _set_camera(
         camera_pos_phi += np.deg2rad(90)
         camera_up_theta -= np.deg2rad(elevation)
 
+        # Focus is middle if not defined
+        if focus is None:
+            focus = np.array(
+                [
+                    scene_bound_data_shape[0] // 2,
+                    scene_bound_data_shape[1] // 2,
+                    scene_bound_data_shape[2] // 2,
+                ]
+            )
+
         # Convert back to cartesian
         camera_pos = sphere2cart(camera_pos_r, camera_pos_theta, camera_pos_phi)
         camera_up = sphere2cart(camera_up_r, camera_up_theta, camera_up_phi)
 
         # Scale to 1.5*max dimension and shift to middle of array
-        camera_pos = np.array(camera_pos) * 1.5 * max(scene_bound_data_shape) + np.array(
-            [
-                scene_bound_data_shape[0] // 2,
-                scene_bound_data_shape[1] // 2,
-                scene_bound_data_shape[2] // 2,
-            ]
-        )
-        camera_focal = np.array(camera_focal) + np.array(
-            [
-                scene_bound_data_shape[0] // 2,
-                scene_bound_data_shape[1] // 2,
-                scene_bound_data_shape[2] // 2,
-            ]
-        )
+        camera_pos = np.array(camera_pos) * 1.5 * max(scene_bound_data_shape) + focus
+        camera_focal = np.array(camera_focal) + focus
 
         # Apply affine to translate into world coordinates
         camera_pos = apply_affine(scene_bound_affine, camera_pos)
         camera_focal = apply_affine(scene_bound_affine, camera_focal)
 
         # Set camera
-        scene.set_camera(position=camera_pos, focal_point=camera_focal, view_up=camera_up)
+        scene.set_camera(
+            position=camera_pos, focal_point=camera_focal, view_up=camera_up
+        )
     else:
         scene.reset_camera()
         camera_pos, camera_focal, _ = scene.get_camera()

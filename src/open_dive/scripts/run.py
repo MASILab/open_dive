@@ -17,7 +17,9 @@ def main():
     scalar_group = parser.add_argument_group("Scalar options")
     overlay_group = parser.add_argument_group("Overlay options")
     tractography_group = parser.add_argument_group("Tractography options")
-    glyph_group = parser.add_argument_group("Diffusion glyph options (tensors and ODFs)")
+    glyph_group = parser.add_argument_group(
+        "Diffusion glyph options (tensors and ODFs)"
+    )
     window_group = parser.add_argument_group("Window options")
 
     scalar_group.add_argument(
@@ -30,7 +32,8 @@ def main():
         "-s",
         "--slice",
         default="m",
-        help='Slice index (integer) or "m" for middle slice. Default is "m".',
+        nargs="+",
+        help='Slice index (integer/tuple of three integers) or "m" for middle slice. Default is "m".',
     )
     scalar_group.add_argument(
         "-o",
@@ -40,7 +43,7 @@ def main():
     )
     scalar_group.add_argument(
         "--value_range",
-        type=int,
+        type=float,
         nargs=2,
         help="Value range to pass to slicer. Default is (min, max) of --nifti_path.",
     )
@@ -120,7 +123,7 @@ def main():
     tractography_group.add_argument(
         "--tractography_color_by_endpoints",
         action="store_true",
-        help='Whether to color by endpoints alone or by individual points when using colormaps "rgb_standard" or "boys_standard". Default is False.'
+        help='Whether to color by endpoints alone or by individual points when using colormaps "rgb_standard" or "boys_standard". Default is False.',
     )
     tractography_group.add_argument(
         "--tractography_opacity",
@@ -198,6 +201,9 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    # If args.slice is a list of one element, convert to int or "m"
+    if isinstance(args.slice, list) and len(args.slice) == 1:
+        args.slice = args.slice[0]
     if args.zoom <= 0:
         parser.error("--zoom must be a positive value.")
 

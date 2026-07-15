@@ -32,6 +32,7 @@ def plot_nifti(
     data_slice: str | tuple[int, int, int] | int = "m",
     orientation: str = "axial",
     size: tuple[int, int] = (600, 400),
+    nifti_cmap: str | None = "gray",
     zoom: float = 1.0,
     azimuth: float | None = None,
     elevation: float | None = None,
@@ -69,6 +70,8 @@ def plot_nifti(
         Slice to plot or "m" for middle slice
     orientation : str, default "axial"
         Can be "axial", "sagittal" or "coronal"
+    nifti_cmap : str, default "gray"
+        Colormap to use for the NIFTI image
     size : tuple, default (600, 400)
         Size of window
     zoom : float, default 1.0
@@ -211,7 +214,7 @@ def plot_nifti(
             volume_idx=volume_idx,
             value_range=value_range,
             opacity=opacity,
-            cmap="gray",
+            cmap=nifti_cmap,
             **kwargs,
         )
         scene.add(slice_actor)

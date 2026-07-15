@@ -35,6 +35,11 @@ def main():
         nargs="+",
         help='Slice index (integer/tuple of three integers) or "m" for middle slice. Default is "m".',
     )
+    overlay_group.add_argument(
+        "--cmap",
+        default="gray",
+        help='Matplotlib or cmcrameri colormap to use for image. Default is "gray".',
+    )
     scalar_group.add_argument(
         "-o",
         "--orientation",
@@ -211,6 +216,7 @@ def main():
     plot_nifti(
         nifti_path=args.nifti_path,
         data_slice=args.slice,
+        nifti_cmap=args.cmap,
         orientation=args.orientation,
         size=args.size,
         zoom=args.zoom,

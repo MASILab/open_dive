@@ -35,7 +35,7 @@ def main():
         nargs="+",
         help='Slice index (integer/tuple of three integers) or "m" for middle slice. Default is "m".',
     )
-    overlay_group.add_argument(
+    scalar_group.add_argument(
         "--cmap",
         default="gray",
         help='Matplotlib or cmcrameri colormap to use for image. Default is "gray".',

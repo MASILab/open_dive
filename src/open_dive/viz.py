@@ -21,7 +21,8 @@ from fury.actor import (
     slicer,
 )
 from fury.lib import Actor
-from fury.utils import apply_affine
+from fury.utils import apply_affine, apply_affine_to_actor
+from fury.transform import transform_from_matrix
 from fury.colormap import line_colors, orient2rgb, boys2rgb
 from matplotlib.colors import Colormap
 from scipy.ndimage import binary_dilation, gaussian_filter
@@ -178,7 +179,7 @@ def plot_nifti(
         scene_bound_nifti = nib.load(scene_bound_nifti_path)
         # scene_bound_data, scene_bound_affine = load_nifti(scene_bound_nifti_path)
         scene_bound_nifti = nib.as_closest_canonical(scene_bound_nifti)
-        scene_bound_affine = scene_bound_nifti.affine
+        scene_bound_affine = np.eye(4)  # scene_bound_nifti.affine
         scene_bound_data = scene_bound_nifti.get_fdata()
         scene_bound_data_shape = scene_bound_data.shape
 
@@ -240,6 +241,7 @@ def plot_nifti(
             colorbar_position=(0.8, 0.1),
             colorbar_height=0.5,
             colorbar_width=0.1,
+            cmap=plt.get_cmap(nifti_cmap),
         )
         scene.add(scalar_bar)
 
@@ -279,11 +281,17 @@ def plot_nifti(
             colors = tractography_cmap
 
         # Add each tractography with its corresponding color
+        affine = (
+            np.linalg.inv(scene_bound_affine)
+            if scene_bound_affine is not None
+            else None
+        )
         stream_actors = _create_tractography_actor(
             tractography_path,
             colors=colors,
             tractography_opacity=tractography_opacity,
             tractography_color_by_endpoints=tractography_color_by_endpoints,
+            affine=affine,
         )
         for stream_actor in stream_actors:
             scene.add(stream_actor)
@@ -408,6 +416,7 @@ def _create_nifti_actor(
     # nifti = nib.load(nifti_path)
     # nifti = nib.as_closest_canonical(nifti)
     nifti = nib.load(nifti_path)
+    nifti = nib.as_closest_canonical(nifti)
 
     if len(nifti.shape) == 4:
         if volume_idx is None:
@@ -428,7 +437,7 @@ def _create_nifti_actor(
         data = nifti.get_fdata()
 
     # Get the data and affine
-    affine = nifti.affine
+    affine = np.eye(4)  # nifti.affine
 
     # value range
     if cmap == "slant":
@@ -509,6 +518,9 @@ def _create_colorbar_actor(
     colorbar.SetPosition(*colorbar_position)  # Position of the colorbar
     colorbar.SetHeight(colorbar_height)  # Adjust height (increase size)
     colorbar.SetWidth(colorbar_width)  # Adjust width (increase size)
+    label_prop = colorbar.GetLabelTextProperty()
+    label_prop.ItalicOff()
+    label_prop.SetFontFamilyToArial()
 
     if not labels:
         colorbar.SetLabelFormat("")
@@ -521,6 +533,7 @@ def _create_tractography_actor(
     colors: list[tuple[float, float, float]] | str,
     tractography_opacity: list[float] = [0.6],
     tractography_color_by_endpoints: bool = False,
+    affine: np.ndarray | None = None,
 ) -> list[Actor]:
     """Create tractography actors from a list of files."""
 
@@ -566,16 +579,34 @@ def _create_tractography_actor(
                 linewidth=0.2,
                 opacity=tractography_opacity[i],
             )
+            stream_actor = (
+                apply_affine_to_actor(stream_actor, affine)
+                if affine is not None
+                else stream_actor
+            )
             stream_actors.append(stream_actor)
     else:
-        for i, (tract_file, color) in enumerate(zip(tractography_path, colors)):
+        # If colors is a string, we need to sample the colormap
+        if isinstance(colors, str):
+            cmap = plt.get_cmap(colors)
+            colors = [
+                cmap(i / (len(tractography_path)))
+                for i in range(len(tractography_path))
+            ]
+        for i, (tract_file) in enumerate(tractography_path):
             streamlines_nifti = nib.streamlines.load(tract_file)
             streamlines = streamlines_nifti.streamlines
+            color = colors[i] if isinstance(colors, list) else colors
             stream_actor = actor.line(
                 streamlines,
                 colors=color,
                 linewidth=0.2,
                 opacity=tractography_opacity[i],
+            )
+            stream_actor = (
+                apply_affine_to_actor(stream_actor, affine)
+                if affine is not None
+                else stream_actor
             )
             stream_actors.append(stream_actor)
     return stream_actors
@@ -594,7 +625,7 @@ def _create_tensor_actor(
     tensor_nifti = nib.load(tensor_path)
     tensor_nifti = nib.as_closest_canonical(tensor_nifti)
     tensor_data = tensor_nifti.get_fdata()
-    tensor_affine = tensor_nifti.affine
+    tensor_affine = np.eye(4)  # tensor_nifti.affine
     tensor_matrix = from_lower_triangular(tensor_data)
     eigvals, eigvecs = decompose_tensor(tensor_matrix)
     mask = np.ones(tensor_data.shape[:3])
@@ -655,7 +686,7 @@ def _create_odf_actor(
     odf_nifti = nib.load(odf_path)
     odf_nifti = nib.as_closest_canonical(odf_nifti)
     odf_data = odf_nifti.get_fdata()
-    odf_affine = odf_nifti.affine
+    odf_affine = np.eye(4)  # odf_nifti.affine
     sphere = get_sphere(name="repulsion724")  # Use a precomputed sphere
     sh_order_max = calculate_max_order(odf_data.shape[-1])
     B, _ = sh_to_sf_matrix(
@@ -666,7 +697,7 @@ def _create_odf_actor(
         sphere=sphere,
         B_matrix=B,
         scale=scale,
-        norm=False,
+        norm=None,
         affine=odf_affine,
     )
 

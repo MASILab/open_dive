@@ -59,6 +59,7 @@ def plot_nifti(
     sh_basis: str = "descoteaux07",
     scale: int = 1,
     glass_brain_path: os.PathLike | None = None,
+    background_color: tuple[float, float, float] = (0.0, 0.0, 0.0),
     **kwargs,
 ) -> None:
     """Create a 2D rendering of a NIFTI slice.
@@ -125,6 +126,8 @@ def plot_nifti(
         Scale of the tensor glyphs or ODF glyphs
     glass_brain_path : os.PathLike, optional
         Optional glass brain mask to overlay
+    background_color : tuple of float, default (0.0, 0.0, 0.0)
+        Background color of the scene, in RGB format from 0 to 1
 
     **kwargs
         Additional keyword arguments to pass to fury.actor.slicer
@@ -327,6 +330,9 @@ def plot_nifti(
             glass_brain_affine = glass_brain.affine
             scene_bound_data_shape = glass_brain_data.shape
             scene_bound_affine = glass_brain_affine
+
+    # Set background color
+    scene.background(background_color)
 
     _set_camera(
         scene=scene,

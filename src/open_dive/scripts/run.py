@@ -36,6 +36,11 @@ def main():
         help='Slice index (integer/tuple of three integers) or "m" for middle slice. Default is "m".',
     )
     scalar_group.add_argument(
+        "--cmap",
+        default="gray",
+        help='Matplotlib or cmcrameri colormap to use for image. Default is "gray".',
+    )
+    scalar_group.add_argument(
         "-o",
         "--orientation",
         default="axial",
@@ -193,6 +198,21 @@ def main():
         default=None,
         help="Elevation angle of the view.",
     )
+    window_group.add_argument(
+        "--background_color",
+        type=float,
+        nargs=3,
+        default=(0.0, 0.0, 0.0),
+        help="Background color of the scene in RGB format (three floats between 0 and 1). Default is black (0.0, 0.0, 0.0).",
+    )
+    window_group.add_argument(
+        "--label_color",
+        type=float,
+        nargs=3,
+        default=(1.0, 1.0, 1.0),
+        help="Label color of the text in RGB format (three floats between 0 and 1). Default is white (1.0, 1.0, 1.0).",
+    )
+
 
     args = parser.parse_args()
 
@@ -211,6 +231,7 @@ def main():
     plot_nifti(
         nifti_path=args.nifti_path,
         data_slice=args.slice,
+        nifti_cmap=args.cmap,
         orientation=args.orientation,
         size=args.size,
         zoom=args.zoom,
@@ -239,4 +260,6 @@ def main():
         azimuth=args.azimuth,
         elevation=args.elevation,
         glass_brain_path=args.glass_brain,
+        background_color=args.background_color,
+        label_color=args.label_color,
     )

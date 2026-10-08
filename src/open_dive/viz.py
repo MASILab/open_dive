@@ -60,6 +60,7 @@ def plot_nifti(
     scale: int = 1,
     glass_brain_path: os.PathLike | None = None,
     background_color: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    label_color: tuple[float, float, float] = (0.0, 0.0, 0.0),
     **kwargs,
 ) -> None:
     """Create a 2D rendering of a NIFTI slice.
@@ -128,6 +129,8 @@ def plot_nifti(
         Optional glass brain mask to overlay
     background_color : tuple of float, default (0.0, 0.0, 0.0)
         Background color of the scene, in RGB format from 0 to 1
+    label_color : tuple of float, default (0.0, 0.0, 0.0)
+        Label color of the colorbar, in RGB format from 0 to 1
 
     **kwargs
         Additional keyword arguments to pass to fury.actor.slicer
@@ -245,6 +248,7 @@ def plot_nifti(
             colorbar_height=0.5,
             colorbar_width=0.1,
             cmap=plt.get_cmap(nifti_cmap),
+            label_color=label_color,
         )
         scene.add(scalar_bar)
 
@@ -492,6 +496,7 @@ def _create_colorbar_actor(
     colorbar_width: float = 0.1,
     cmap: Colormap | None = None,
     labels: bool = True,
+    label_color: tuple[float, float, float] = (0, 0, 0),
 ) -> vtk.vtkScalarBarActor:
     """Create a colorbar actor for the scene."""
 
@@ -527,6 +532,7 @@ def _create_colorbar_actor(
     label_prop = colorbar.GetLabelTextProperty()
     label_prop.ItalicOff()
     label_prop.SetFontFamilyToArial()
+    label_prop.SetColor(label_color)
 
     if not labels:
         colorbar.SetLabelFormat("")

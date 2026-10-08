@@ -205,6 +205,14 @@ def main():
         default=(0.0, 0.0, 0.0),
         help="Background color of the scene in RGB format (three floats between 0 and 1). Default is black (0.0, 0.0, 0.0).",
     )
+    window_group.add_argument(
+        "--label_color",
+        type=float,
+        nargs=3,
+        default=(1.0, 1.0, 1.0),
+        help="Label color of the text in RGB format (three floats between 0 and 1). Default is white (1.0, 1.0, 1.0).",
+    )
+
 
     args = parser.parse_args()
 
@@ -253,4 +261,5 @@ def main():
         elevation=args.elevation,
         glass_brain_path=args.glass_brain,
         background_color=args.background_color,
+        label_color=args.label_color,
     )
